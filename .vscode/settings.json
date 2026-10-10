@@ -1,0 +1,7 @@
+{
+  "editor.formatOnSave": true,
+  "[terraform]": { "editor.defaultFormatter": "hashicorp.terraform" },
+  "files.eol": "\n",
+  "python.testing.pytestArgs": ["app/tests"],
+  "python.testing.pytestEnabled": true
+}

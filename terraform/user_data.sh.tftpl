@@ -1,0 +1,74 @@
+#!/bin/bash
+# Bootstrap a Rocky Linux 9 server to run the dashboard container.
+# Log: /var/log/bootstrap.log, also shipped to CloudWatch Logs.
+set -euxo pipefail
+exec > >(tee -a /var/log/bootstrap.log) 2>&1
+
+# Container runtime and tools
+dnf -y install podman unzip
+
+# SSM agent: Session Manager access with no SSH (not preinstalled on Rocky)
+dnf -y install https://s3.${region}.amazonaws.com/amazon-ssm-${region}/latest/linux_amd64/amazon-ssm-agent.rpm
+systemctl enable --now amazon-ssm-agent
+
+# AWS CLI v2, used only to get a short-lived ECR login token
+curl -fsSL https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o /tmp/awscliv2.zip
+unzip -q -o /tmp/awscliv2.zip -d /tmp
+/tmp/aws/install --update
+
+# CloudWatch agent: ships the audit log off the server, reports memory and disk
+dnf -y install https://amazoncloudwatch-agent.s3.amazonaws.com/redhat/amd64/latest/amazon-cloudwatch-agent.rpm
+mkdir -p /var/log/dashboard
+cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json <<'CWA'
+{
+  "agent": { "run_as_user": "root" },
+  "logs": {
+    "logs_collected": {
+      "files": {
+        "collect_list": [
+          { "file_path": "/var/log/dashboard/app.log", "log_group_name": "${audit_log_group}", "log_stream_name": "{instance_id}" },
+          { "file_path": "/var/log/bootstrap.log", "log_group_name": "${boot_log_group}", "log_stream_name": "{instance_id}" }
+        ]
+      }
+    }
+  },
+  "metrics": {
+    "namespace": "CWAgent",
+    "metrics_collected": {
+      "mem": { "measurement": ["mem_used_percent"] },
+      "disk": { "measurement": ["used_percent"], "resources": ["/"] }
+    }
+  }
+}
+CWA
+/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s \
+  -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
+
+# Run the container under systemd: restarts on failure and on reboot.
+# The container's output is written straight to /var/log/dashboard/app.log for
+# the CloudWatch agent to ship. (passthrough discarded it to /dev/null.)
+cat > /etc/systemd/system/dashboard.service <<'UNIT'
+[Unit]
+Description=Trial dashboard container
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Restart=always
+RestartSec=20
+TimeoutStartSec=300
+StandardOutput=append:/var/log/dashboard/app.log
+StandardError=append:/var/log/dashboard/app.log
+ExecStartPre=-/usr/bin/podman rm -f dashboard
+ExecStartPre=/bin/sh -c '/usr/local/bin/aws ecr get-login-password --region ${region} | /usr/bin/podman login --username AWS --password-stdin ${registry}'
+ExecStartPre=/usr/bin/podman pull ${image}
+ExecStart=/usr/bin/podman run --rm --name dashboard -p 8000:8000 --read-only --tmpfs /tmp --cap-drop=ALL --security-opt=no-new-privileges --log-driver=k8s-file --log-opt path=/var/log/dashboard/app.log -e AWS_REGION=${region} -e ALB_ARN=${alb_arn} -e APP_VERSION=${image_tag} -e REQUIRE_LOGIN=true ${image}
+ExecStop=/usr/bin/podman stop -t 10 dashboard
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+systemctl daemon-reload
+systemctl enable --now dashboard.service

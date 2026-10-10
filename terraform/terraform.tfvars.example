@@ -1,0 +1,6 @@
+# Copy to terraform.tfvars and fill in. terraform.tfvars is git-ignored: never commit it.
+allowed_cidrs   = ["203.0.113.10/32"]                    # your public IP from https://checkip.amazonaws.com in YOUR browser (not CloudShell), plus /32
+alert_email     = "you@example.com"
+entra_tenant_id = "00000000-0000-0000-0000-000000000000" # YOUR test tenant only
+entra_client_id = "00000000-0000-0000-0000-000000000000"
+image_tag       = "v2"
