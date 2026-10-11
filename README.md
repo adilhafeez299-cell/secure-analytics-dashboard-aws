@@ -44,6 +44,14 @@ The picture is the full target design. The demo builds the core of it (see *What
 - **Recovery times, one server:** container killed, restarted in about 22 s; service stopped, unhealthy after 48 s, replacement launched after 85 s, healthy again in about 5 minutes with no human action.
 - **Known issue:** each audit line appears twice in CloudWatch (two writers to one file). Harmless; the fix is `StandardOutput=journal` in the unit.
 
+## Known limitations
+
+These are fine for a demo that lives for a few days. Each one needs closing before real data goes near it.
+
+- **No patching.** The server image is fixed at the first apply and the bootstrap doesn't update packages, so a long-running server falls behind on OS patches. Production: rebuild the image on a schedule and roll it out with an instance refresh, or use SSM Patch Manager.
+- **Pinning is partial.** The top-level Python packages are pinned, but not their dependencies, and the base image is the `python:3.12-slim` tag, not a digest. The server bootstrap installs the latest SSM agent, CloudWatch agent and AWS CLI. Production: a hashed lock file, a digest-pinned base image and a pre-built server image.
+- **An open tab outlives the login.** The app checks who you are when the browser connects. A dashboard left open keeps that connection after the 1-hour login expires, until the page reloads or the connection drops. Production: re-check the token on a timer and close stale sessions.
+
 ## Deploy it yourself
 
 About 3 hours and £1-2 if you destroy it the same day. Step by step: [docs/DEPLOY.md](docs/DEPLOY.md).
