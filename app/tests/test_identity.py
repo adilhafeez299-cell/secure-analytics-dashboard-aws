@@ -15,14 +15,16 @@ PUB = KEY.public_key().public_bytes(serialization.Encoding.PEM, serialization.Pu
 OTHER = ec.generate_private_key(ec.SECP256R1())
 
 
-def token(signer=SIGNER, key=KEY, exp_offset=600, claims=None, name="Test Analyst"):
+def token(signer=SIGNER, key=KEY, exp_offset=600, claims=None, name="Test Analyst", alg="ES256", omit=()):
     """Build a token the way the real ALB does: padded base64url, signed over the PADDED text."""
     def b64(obj):
         return base64.urlsafe_b64encode(json.dumps(obj, separators=(",", ":")).encode()).decode()
 
-    head = b64({"alg": "ES256", "kid": "k1", "signer": signer, "iss": "x", "client": "c", "typ": "JWT"})
+    head = b64({"alg": alg, "kid": "k1", "signer": signer, "iss": "x", "client": "c", "typ": "JWT"})
     body_claims = {"sub": "abc-123", "name": name, "exp": int(time.time()) + exp_offset}
     body_claims.update(claims or {})
+    for claim in omit:
+        del body_claims[claim]
     body = b64(body_claims)
     sig = jwt.algorithms.ECAlgorithm(jwt.algorithms.ECAlgorithm.SHA256).sign(f"{head}.{body}".encode(), key)
     return f"{head}.{body}.{base64.urlsafe_b64encode(sig).decode()}"
@@ -52,6 +54,27 @@ def test_forged_signature_rejected():
 
 def test_expired_rejected():
     assert not ident(token(exp_offset=-60)).verified
+
+
+def test_missing_expiry_rejected():
+    assert not ident(token(omit=("exp",))).verified
+
+
+def test_other_algorithm_rejected():
+    # Correctly signed, but the header claims another algorithm.
+    assert not ident(token(alg="none")).verified
+    assert not ident(token(alg="HS256")).verified
+
+
+def test_malformed_token_rejected():
+    for bad in ("not-a-token", "a.b", "a.b.c.d", "!!.!!.!!"):
+        assert not ident(bad).verified, bad
+
+
+def test_no_configured_load_balancer_rejects_everything():
+    # ALB_ARN unset must fail closed, even for a token signed with the right key.
+    headers = {"x-amzn-oidc-data": token(signer="")}
+    assert not identity.identity_from_headers(headers, key_fetcher=fetch, expected_signer="").verified
 
 
 def test_no_header_is_anonymous():
