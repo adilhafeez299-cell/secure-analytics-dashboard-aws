@@ -8,7 +8,7 @@ What actually happened when I deployed this. Problems and fixes are kept on purp
 - **Region:** eu-west-2 (London)
 - **Account:** a personal AWS account, with a personal Microsoft Entra tenant
 - **Image tags:** v1 (first deploy), v2 (fix described below)
-- **Terraform:** 1.9.8, run from AWS CloudShell, local state
+- **Terraform:** 1.9.8, run from AWS CloudShell; state moved on 10 Oct from local to an encrypted, versioned S3 bucket with DynamoDB locking (plan showed no changes after the move)
 
 ## Problems and fixes
 
@@ -58,3 +58,6 @@ To be completed after `terraform destroy`: errors, leftovers, bill.
 - Ship container logs on day one. Silence in the log was the first sign something was wrong.
 - A health check and an Auto Scaling Group give you self-healing for free, but one server still means about five minutes of downtime. Two servers in two zones is the answer, not a faster restart.
 - Pasting a secret into the wrong window is easy. Rotate immediately and carry on.
+
+- **WAF added 10 Oct:** web ACL with AWS common and known-bad-inputs rules, a rate limit, and CloudWatch logging with cookies and the identity header redacted. Cookie-size rule set to count. Normal request: 302 to Entra. Script-tag request: 403. Sign-in unaffected. 67 resources in state.
+- **Audit changes, 11 Oct:** after the build I made login fail closed by default, narrowed the flow-log role to its own log group, widened the token tests and listed known limitations in the README. These are in the repository but were not applied to the running environment, which still uses image v2.

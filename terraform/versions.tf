@@ -12,8 +12,8 @@ terraform {
     }
   }
 
-  # Demo: local state in CloudShell home. In real life: an encrypted S3
-  # backend with locking, because state holds the OIDC client secret.
+  # State holds the OIDC client secret. For anything beyond a local try-out,
+  # use an encrypted S3 backend with locking: see backend.tf.example.
 }
 
 provider "aws" {

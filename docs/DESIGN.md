@@ -34,7 +34,7 @@ For 15 users, Kubernetes adds a control plane, upgrades and skills overhead for 
 
 ### 3. A container image
 
-The image pins OS libraries, the runtime and every package, so what was tested is what runs. Every release is a new immutable tag; rollback is the previous tag. The same image moves to ECS or Kubernetes without changes.
+The image carries the OS libraries, the runtime and the packages together, so what was tested is what runs. (The demo pins only the top-level packages; see *Known limitations* in the README.) Every release is a new immutable tag; rollback is the previous tag. The same image moves to ECS or Kubernetes without changes.
 
 ### 4. Login at the load balancer, verified again in the app
 
@@ -62,7 +62,7 @@ The app writes JSON audit events (user, action, time). The CloudWatch agent ship
 | At rest | Encrypted disks; secret encrypted with a customer-managed KMS key |
 | Server | No public IP, no SSH, IMDSv2 with hop limit 1 (containers can't reach instance credentials) |
 | Container | Non-root, read-only root filesystem, all Linux capabilities dropped, no-new-privileges |
-| Supply chain | Pinned packages; ECR scan on push; immutable tags |
+| Supply chain | Pinned top-level packages; ECR scan on push; immutable tags |
 | Detection | Alarms on health, errors, latency, CPU; VPC Flow Logs; ALB access logs |
 
 ## Compliance mapping: MHRA data integrity (ALCOA+)

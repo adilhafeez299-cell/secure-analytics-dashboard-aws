@@ -112,3 +112,21 @@ Then check that no NAT gateway or Elastic IP is left, and delete the Entra clien
 | 401 or 561 after sign-in | Wrong secret: the Secret ID instead of the Value, or JSON instead of plain text |
 | 502 or 503 | Server still booting or app crashed. Check `/var/log/bootstrap.log`, `systemctl status dashboard` and `/var/log/dashboard/app.log` |
 | "not verified" or the session closes | Token check failing. Check the server can reach the internet through the NAT |
+
+
+## Remote state (recommended)
+
+Terraform state holds secrets, so keep it off your laptop. Create the bucket and lock table once, outside this Terraform (it cannot create its own state store):
+
+```
+BUCKET=pharma-dash-tfstate-$(openssl rand -hex 4)
+aws s3api create-bucket --bucket $BUCKET --region eu-west-2 --create-bucket-configuration LocationConstraint=eu-west-2
+aws s3api put-public-access-block --bucket $BUCKET --public-access-block-configuration BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+aws s3api put-bucket-versioning --bucket $BUCKET --versioning-configuration Status=Enabled
+aws s3api put-bucket-encryption --bucket $BUCKET --server-side-encryption-configuration '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"aws:kms"},"BucketKeyEnabled":true}]}'
+aws dynamodb create-table --table-name pharma-dash-tflock --attribute-definitions AttributeName=LockID,AttributeType=S --key-schema AttributeName=LockID,KeyType=HASH --billing-mode PAY_PER_REQUEST --region eu-west-2
+```
+
+Then copy `terraform/backend.tf.example` to `terraform/backend.tf` and run `terraform init -migrate-state -backend-config="bucket=$BUCKET"`. Check `terraform plan` shows no changes.
+
+To tear down: run `terraform destroy` first, then delete every version in the bucket and the bucket itself, then delete the lock table. They sit outside Terraform, so destroy does not remove them.

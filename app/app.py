@@ -7,7 +7,8 @@ Behind the AWS Application Load Balancer, every request carries
 x-amzn-oidc-data: a JWT the load balancer signs after the user has
 signed in with Microsoft Entra ID. The app verifies that signature
 before trusting the user's name, then writes an audit line for each
-action (who, what, when) to stdout, which systemd sends to journald.
+action (who, what, when) to stdout, which Podman writes to a log file
+that the CloudWatch agent ships off the server.
 """
 
 import json
@@ -30,8 +31,8 @@ from starlette.routing import Mount, Route  # noqa: E402
 from identity import identity_from_headers  # noqa: E402
 
 APP_VERSION = os.environ.get("APP_VERSION", "dev")
-# On AWS this is "true": no verified login, no data. Local testing leaves it off.
-REQUIRE_LOGIN = os.environ.get("REQUIRE_LOGIN", "false").lower() == "true"
+# No verified login, no data. Only an explicit REQUIRE_LOGIN=false (local testing) turns this off.
+REQUIRE_LOGIN = os.environ.get("REQUIRE_LOGIN", "true").lower() != "false"
 
 # ---------- audit logging: one JSON line per event ----------
 audit_log = logging.getLogger("audit")
