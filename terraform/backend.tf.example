@@ -1,0 +1,11 @@
+# Optional remote state. To use it: create the bucket and lock table (see docs/DEPLOY.md,
+# "Remote state"), copy this file to backend.tf, then run:
+#   terraform init -migrate-state -backend-config="bucket=YOUR-STATE-BUCKET"
+terraform {
+  backend "s3" {
+    key            = "pharma-dash/terraform.tfstate"
+    region         = "eu-west-2"
+    dynamodb_table = "pharma-dash-tflock"
+    encrypt        = true
+  }
+}

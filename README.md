@@ -29,7 +29,9 @@ The picture is the full target design. The demo builds the core of it (see *What
 | Audit trail | App audit events (who, what, when) shipped to CloudWatch Logs, so they survive the server being replaced | `terraform/monitoring.tf` |
 | Monitoring | Alarms to email: no healthy server, app 5xx, slow responses, high CPU; memory and disk via CloudWatch agent; VPC Flow Logs; ALB access logs | `terraform/monitoring.tf` |
 
-**Design only, not in the demo:** RDS PostgreSQL (Multi-AZ), AWS WAF, TLS between the load balancer and the server, a domain with an ACM-issued certificate (the demo uses self-signed), a NAT gateway per AZ, CloudTrail with S3 Object Lock, AWS Backup, remote encrypted Terraform state. The reasons are in [docs/DESIGN.md](docs/DESIGN.md).
+**Added late, built and tested:** AWS WAF on the load balancer with managed rules, a per-IP rate limit and redacted logging. The cookie-size rule is set to count, because the load balancer's sign-in cookies can exceed its limit. Terraform state also moved to an encrypted S3 backend with locking.
+
+**Design only, not in the demo:** RDS PostgreSQL (Multi-AZ), TLS between the load balancer and the server, a domain with an ACM-issued certificate (the demo uses self-signed), a NAT gateway per AZ, CloudTrail with S3 Object Lock, AWS Backup. The reasons are in [docs/DESIGN.md](docs/DESIGN.md).
 
 ## How I tested it
 
@@ -69,8 +71,7 @@ docs/evidence/      Screenshots from the live build
 
 ## What I'd do next
 
-1. Move Terraform state to an encrypted S3 backend with locking (local state holds the client secret).
-2. Add RDS PostgreSQL in private data subnets, with the password rotated by Secrets Manager.
-3. AWS WAF on the load balancer, with the cookie-size rule tuned for the login cookies.
-4. Deploy the app through CI to a test environment first, then promote the same image to production.
-5. Two servers across two AZs, and a NAT gateway per AZ.
+1. Add RDS PostgreSQL in private data subnets, with the password rotated by Secrets Manager.
+2. Tune the WAF: watch the count for the cookie-size rule against real login cookies, then decide whether to block.
+3. Deploy the app through CI to a test environment first, then promote the same image to production.
+4. Two servers across two AZs, and a NAT gateway per AZ.
