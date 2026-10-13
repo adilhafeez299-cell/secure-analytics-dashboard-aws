@@ -72,6 +72,8 @@ docs/evidence/      Screenshots from the live build
 ## What I'd do next
 
 1. Add RDS PostgreSQL in private data subnets, with the password rotated by Secrets Manager.
-2. Tune the WAF: watch the count for the cookie-size rule against real login cookies, then decide whether to block.
-3. Deploy the app through CI to a test environment first, then promote the same image to production.
-4. Two servers across two AZs, and a NAT gateway per AZ.
+2. A real domain with an ACM-issued certificate, and TLS from the load balancer to the server.
+3. Tune the WAF: watch the count for the cookie-size rule against real login cookies, then decide whether to block.
+4. Deploy the app through CI to a test environment first, then promote the same image to production.
+5. Two servers across two AZs, and a NAT gateway per AZ.
+6. CloudTrail with S3 Object Lock, and AWS Backup.
